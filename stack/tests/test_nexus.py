@@ -54,5 +54,5 @@ def test_trace_observes_every_stage():
     nexus, _ = _nexus(2, trace=trace)
     nexus.tick()
     events = {r.event for r in trace.records}
-    for stage in ("emit", "submit", "decode", "apply", "perceive", "tick"):
+    for stage in ("emit", "decode", "apply", "perceive", "tick"):
         assert stage in events, stage

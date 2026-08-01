@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from brain import Brain
-from fabric import Fabric
 from locus import Locus
 
 
@@ -42,8 +41,7 @@ class Nexus:
     Args:
         brains: The nodes to drive.
         locus: The shared environment manager. Every brain must be registered
-            in it (see ``add_brain``/``register``).
-        fabric: The consensus seam beneath Locus. A fresh pass-through by default.
+            in it (see the demo for placement).
         trace: Optional Basis TRACE recorder passed through for observation.
     """
 
@@ -52,35 +50,26 @@ class Nexus:
         brains: List[Brain],
         locus: Locus,
         *,
-        fabric: Optional[Fabric] = None,
         trace: Optional[Any] = None,
     ) -> None:
         self.brains = list(brains)
         self.locus = locus
-        self.fabric = fabric or Fabric(trace=trace)
         self._trace = trace
         self._tick = 0
 
     def tick(self) -> TickResult:
         """Run one full signal-loop cycle for all brains and return the result."""
         signals: Dict[str, Any] = {}
+        perceptions: Dict[str, Any] = {}
 
-        # 1. Each Brain emits; the signal passes through SNP (validated inside
-        #    emit) and is submitted to Fabric.
+        # Each Brain emits (validated by SNP inside emit); Locus decodes the
+        # vector into an action, applies it, and produces the node's perception.
+        # Fabric operates at the shared-state layer (see nexus.graph), not on the
+        # single-authority signal path, so a lone Locus needs no consensus.
         for brain in self.brains:
             msg = brain.emit()
             signals[brain.node_id] = msg
-            self.fabric.submit(msg)
-
-        # 2. Fabric releases messages in order (pass-through in v1).
-        released = self.fabric.drain()
-
-        # 3. Locus applies each signal (decode -> action) and produces the
-        #    node's perception update.
-        perceptions: Dict[str, Any] = {}
-        for msg in released:
-            perception = self.locus.process(msg)
-            perceptions[msg["node_id"]] = perception
+            perceptions[brain.node_id] = self.locus.process(msg)
 
         if self._trace is not None:
             self._trace.record(

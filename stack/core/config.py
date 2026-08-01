@@ -28,11 +28,15 @@ class GraphConfig:
         nodes_per_shard: Inclusive (min, max) nodes placed per shard; the exact
             count per shard is drawn deterministically from the seed.
         room_size: Side length of each shard's square room.
+        n_shared_resources: Number of globally shared resources nodes contend
+            for; contention (and thus Fabric work) occurs when nodes outnumber
+            resources.
     """
 
     n_shards: int = 1
     nodes_per_shard: Tuple[int, int] = (2, 20)
     room_size: float = 10.0
+    n_shared_resources: int = 64
 
 
 @dataclass
