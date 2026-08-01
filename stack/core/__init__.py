@@ -11,6 +11,7 @@ from .config import (
     LogConfig,
     SignalConfig,
 )
+from .montage import hemisphere_labels
 from .rng import derive_seed, rng_for
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "SIGNAL_SOURCES",
     "derive_seed",
     "rng_for",
+    "hemisphere_labels",
 ]

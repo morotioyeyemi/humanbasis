@@ -2,9 +2,15 @@
 
 Locus is the consumption boundary for neural vectors: it is the one place a
 signal becomes a world action, so it is the only component that interprets the
-vector's meaning (the opaque-vector rule). Decoders are keyed by SNP encoding id,
-so adding a modality/encoding means registering a new decoder here without
-touching transport, Fabric, or TRACE.
+vector's meaning (the opaque-vector rule). Decoders are keyed by SNP encoding id.
+
+Decoders are registered for whole modality families programmatically:
+- motor (``mi.*``): left/right by hemisphere band-power (motor-imagery
+  lateralization) - the side with less power is the imagined hand.
+- visual (``ssvep.*``): the dominant frequency band maps to an action.
+
+Adding a modality/encoding means registering a decoder here; transport, Fabric,
+and TRACE never interpret the vector.
 """
 
 from __future__ import annotations
@@ -12,13 +18,16 @@ from __future__ import annotations
 from typing import Callable, Dict, List
 
 import snp
+from core import hemisphere_labels
+from core.montage import LEFT, RIGHT
 
-# An action the environment understands. Kept intentionally small for v1.
 Action = str  # "left" | "right" | "forward"
-
 Decoder = Callable[[List[float]], Action]
 
 _DECODERS: Dict[str, Decoder] = {}
+
+# Visual dominant-frequency -> action mapping (by band index).
+_VISUAL_ACTIONS = ["left", "right", "forward", "left"]
 
 
 def register(encoding: str, decoder: Decoder) -> None:
@@ -27,11 +36,7 @@ def register(encoding: str, decoder: Decoder) -> None:
 
 
 def decode(encoding: str, vector: List[float]) -> Action:
-    """Decode a vector into a world action using the encoding's decoder.
-
-    Raises:
-        KeyError: If no decoder is registered for the encoding.
-    """
+    """Decode a vector into a world action using the encoding's decoder."""
     return _DECODERS[encoding](vector)
 
 
@@ -40,24 +45,44 @@ def has_decoder(encoding: str) -> bool:
     return encoding in _DECODERS
 
 
-def _decode_mi_lr(vector: List[float]) -> Action:
-    """Decode left/right-hand motor imagery from C3/Cz/C4 mu/beta band power.
+def _make_motor_decoder(encoding: str) -> Decoder:
+    layout = snp.get_layout(encoding)
+    n_bands = len(layout.bands)
+    hemis = hemisphere_labels(layout.channels)
+    left_idx = [ci * n_bands + bi for ci, h in enumerate(hemis) if h == LEFT for bi in range(n_bands)]
+    right_idx = [ci * n_bands + bi for ci, h in enumerate(hemis) if h == RIGHT for bi in range(n_bands)]
 
-    Vector layout (mi.c3czc4.mubeta.v1):
-        [C3-mu, C3-beta, Cz-mu, Cz-beta, C4-mu, C4-beta]
+    def decoder(vector: List[float]) -> Action:
+        left_power = sum(vector[i] for i in left_idx)
+        right_power = sum(vector[i] for i in right_idx)
+        # Less power over a hemisphere => imagined the contralateral hand.
+        return "right" if left_power < right_power else "left"
 
-    Motor-imagery lateralization: imagining the RIGHT hand desynchronizes
-    (lowers power in) the LEFT motor cortex (C3); imagining the LEFT hand lowers
-    power over the RIGHT cortex (C4). So the side with LESS power indicates the
-    imagined hand. Lower power over C3 -> right hand -> turn right; lower over
-    C4 -> left hand -> turn left.
-    """
-    c3 = vector[0] + vector[1]
-    c4 = vector[4] + vector[5]
-    return "right" if c3 < c4 else "left"
+    return decoder
 
 
-# Register v1 decoders. Layout is validated against the registry on registration.
-_layout = snp.get_layout("mi.c3czc4.mubeta.v1")
-assert _layout.length == 6
-register("mi.c3czc4.mubeta.v1", _decode_mi_lr)
+def _make_visual_decoder(encoding: str) -> Decoder:
+    layout = snp.get_layout(encoding)
+    n_channels = len(layout.channels)
+    n_bands = len(layout.bands)
+
+    def decoder(vector: List[float]) -> Action:
+        band_power = [
+            sum(vector[ci * n_bands + bi] for ci in range(n_channels))
+            for bi in range(n_bands)
+        ]
+        dominant = max(range(n_bands), key=lambda bi: band_power[bi])
+        return _VISUAL_ACTIONS[dominant % len(_VISUAL_ACTIONS)]
+
+    return decoder
+
+
+def _register_all() -> None:
+    for encoding, layout in snp.REGISTRY.items():
+        if layout.signal_type == "motor":
+            register(encoding, _make_motor_decoder(encoding))
+        elif layout.signal_type == "visual":
+            register(encoding, _make_visual_decoder(encoding))
+
+
+_register_all()

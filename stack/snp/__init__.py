@@ -15,6 +15,7 @@ from .encodings import (
     get_layout,
     is_registered,
     known_signal_types,
+    register_band_power,
     signal_type_for,
 )
 from .errors import (
@@ -40,6 +41,7 @@ __all__ = [
     "is_registered",
     "known_signal_types",
     "signal_type_for",
+    "register_band_power",
     "SNPError",
     "SchemaError",
     "UnknownEncodingError",

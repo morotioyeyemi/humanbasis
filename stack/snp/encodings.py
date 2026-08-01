@@ -120,3 +120,66 @@ def signal_type_for(encoding: str) -> str:
 def known_signal_types() -> frozenset:
     """Return the set of signal_types declared by the registry."""
     return frozenset(layout.signal_type for layout in REGISTRY.values())
+
+
+# --- Encoding factory + families -----------------------------------------
+# Wider encodings are generated programmatically so channel width scales without
+# hand-editing. Generic channel names (EEG001..) are used for the parameterized
+# families; the original 3-channel motor encoding keeps real 10-10 names.
+
+MU_BETA = (("mu", (8.0, 13.0)), ("beta", (13.0, 30.0)))
+# SSVEP-style stimulus frequency bins (narrow bands around target flicker rates).
+SSVEP_F4 = (("f8", (7.5, 8.5)), ("f10", (9.5, 10.5)), ("f12", (11.5, 12.5)), ("f15", (14.5, 15.5)))
+
+
+def _generic_channels(n: int) -> Tuple[str, ...]:
+    return tuple(f"EEG{i + 1:03d}" for i in range(n))
+
+
+def register_band_power(
+    encoding: str,
+    *,
+    signal_type: str,
+    channels: Tuple[str, ...],
+    bands: Tuple[Tuple[str, Tuple[float, float]], ...],
+    rate_hz: float = 128.0,
+    window_s: float = 2.0,
+    overwrite: bool = False,
+) -> Layout:
+    """Create and register a channel-band-power encoding; return its Layout."""
+    if encoding in REGISTRY and not overwrite:
+        return REGISTRY[encoding]
+    layout = Layout(
+        signal_type=signal_type,
+        layout="channel_band_power",
+        channels=channels,
+        bands=bands,
+        order="channel_major",
+        rate_hz=rate_hz,
+        window_s=window_s,
+    )
+    REGISTRY[encoding] = layout
+    return layout
+
+
+def _register_families() -> None:
+    # Motor imagery family (mu+beta): widths chosen so vector length spans 6..256.
+    for n in (8, 16, 32, 64, 128):
+        register_band_power(
+            f"mi.{n}ch.mubeta.v1",
+            signal_type="motor",
+            channels=_generic_channels(n),
+            bands=MU_BETA,
+        )
+    # Visual SSVEP family (4 frequency bins): length spans 32..256.
+    for n in (8, 16, 32, 64):
+        register_band_power(
+            f"ssvep.{n}ch.f4.v1",
+            signal_type="visual",
+            channels=_generic_channels(n),
+            bands=SSVEP_F4,
+        )
+
+
+_register_families()
+

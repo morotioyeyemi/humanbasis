@@ -45,4 +45,4 @@ def test_encoding_declares_signal_type():
 
 
 def test_known_signal_types_from_registry():
-    assert snp.known_signal_types() == frozenset({"motor", "perception"})
+    assert snp.known_signal_types() == frozenset({"motor", "perception", "visual"})
