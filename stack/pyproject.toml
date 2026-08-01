@@ -14,8 +14,9 @@ dev = ["pytest>=7"]
 viz = ["matplotlib>=3.7", "pillow>=9", "imageio-ffmpeg>=0.4"]
 
 [tool.setuptools]
-packages = ["snp", "brain", "trace", "locus", "fabric", "nexus"]
+packages = ["snp", "brain", "trace", "locus", "fabric", "nexus", "core"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = [".", "tests"]
+testpaths = ["tests", "evals"]
+pythonpath = [".", "tests", "evals"]
+python_files = ["test_*.py", "eval_*.py"]
