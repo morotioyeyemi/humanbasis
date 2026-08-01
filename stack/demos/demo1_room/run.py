@@ -29,7 +29,15 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
+
+try:  # optional: bundled ffmpeg for .mp4 output
+    import imageio_ffmpeg
+
+    plt.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
+    _HAVE_FFMPEG = True
+except Exception:  # pragma: no cover - mp4 is optional
+    _HAVE_FFMPEG = False
 
 import snp
 from brain import Brain, EpochSet
@@ -98,9 +106,10 @@ def render(results, brains, locus: Locus, out_path: Path) -> None:
     trails = {nid: ([], []) for nid in node_ids}
 
     big = n > 40
-    dot_size = max(8, 90 - n // 3) if not big else 14
+    dot_size = max(8, 90 - n // 3) if not big else 46
     draw_arrows = not big
-    draw_trails = not big
+    draw_trails = True
+    trail_alpha = 0.35 if not big else 0.16
 
     fig, ax = plt.subplots(figsize=(7, 7))
 
@@ -121,15 +130,15 @@ def render(results, brains, locus: Locus, out_path: Path) -> None:
             if draw_trails:
                 trails[nid][0].append(x)
                 trails[nid][1].append(y)
-                ax.plot(trails[nid][0], trails[nid][1], color=color_of[nid], alpha=0.35, linewidth=1)
+                ax.plot(trails[nid][0], trails[nid][1], color=color_of[nid], alpha=trail_alpha, linewidth=1)
             if draw_arrows:
                 ax.arrow(x, y, 0.02 * size * math.cos(h), 0.02 * size * math.sin(h),
                          head_width=0.01 * size, color=color_of[nid], zorder=3)
             xs.append(x)
             ys.append(y)
             cs.append(color_of[nid])
-        ax.scatter(xs, ys, s=dot_size, color=cs, edgecolors="black" if not big else "none",
-                   linewidths=0.4, zorder=3)
+        ax.scatter(xs, ys, s=dot_size, color=cs, edgecolors="black",
+                   linewidths=0.5, zorder=3)
         ax.set_title(f"Basis Demo 1 - {size:g}x{size:g} room, {n} nodes  (tick {results[frame_idx].tick})")
         ax.legend(loc="upper left", fontsize=8)
         return []
@@ -138,7 +147,12 @@ def render(results, brains, locus: Locus, out_path: Path) -> None:
         trails[nid] = ([], [])
     anim = FuncAnimation(fig, draw, frames=len(results), blit=False)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    anim.save(str(out_path), writer=PillowWriter(fps=12))
+    if out_path.suffix.lower() == ".mp4":
+        if not _HAVE_FFMPEG:
+            raise RuntimeError("mp4 output needs ffmpeg; pip install imageio-ffmpeg (or use a .gif path)")
+        anim.save(str(out_path), writer=FFMpegWriter(fps=15, bitrate=2400))
+    else:
+        anim.save(str(out_path), writer=PillowWriter(fps=12))
     plt.close(fig)
 
 

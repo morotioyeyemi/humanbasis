@@ -13,3 +13,4 @@ venv/
 demos/**/_*.png
 demos/**/*_synthetic.gif
 demos/**/*_scale.gif
+demos/**/*_scale.mp4
