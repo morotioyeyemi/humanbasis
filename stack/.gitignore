@@ -8,3 +8,7 @@ dist/
 .pytest_cache/
 .venv/
 venv/
+
+# Generated demo scratch (the showcase demos/demo1_room/demo1.gif is tracked)
+demos/**/_*.png
+demos/**/*_synthetic.gif
