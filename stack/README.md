@@ -37,10 +37,49 @@ Brain.emit() -> SNP -> Fabric -> Locus (decode + apply) -> perception -> SNP
 
 ## Demo 1
 
-Real EEG driving nodes in the shared white room — see
-[`demos/demo1_room/`](demos/demo1_room/README.md).
+The first visual milestone: real EEG driving nodes in the shared white room. It
+produces no committed media — generate it yourself:
 
-![Demo 1](demos/demo1_room/demo1.gif)
+```bash
+pip install -e ".[viz]"
+python demos/demo1_room/run.py --nodes 4 --ticks 100 --subjects 1,2,3,4
+# output -> demos/demo1_room/outputs/demo1.gif   (open it to watch)
+```
+
+Full options, more examples (mp4, 200-node scale run), and troubleshooting are in
+[`demos/demo1_room/README.md`](demos/demo1_room/README.md).
+
+## Quickstart
+
+```bash
+# from the repo root: humanbasis/stack
+python -m venv .venv && . .venv/Scripts/activate    # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -e ".[dev,viz]"                         # core + tests + rendering
+pytest -q                                           # unit tests (synthetic, no network)
+python demos/demo1_room/run.py --synthetic          # a first render, offline
+```
+
+Requirements: Python >= 3.10. Core deps (numpy, scipy, mne) install with the
+package; `viz` adds matplotlib/pillow/imageio-ffmpeg for the demo renderer.
+
+## Repository layout
+
+```
+stack/
+  snp/       # SNP contract: schema, encoding registry, validate, normalize
+  brain/     # Basis Brain: EEGMMIDB loader, band-power features, Brain node
+  locus/     # Basis Locus: white-room environment, decoders, Locus boundary
+  fabric/    # Basis Fabric: pass-through consensus seam (v1)
+  nexus/     # Nexus: integration layer that runs the signal loop
+  trace/     # Basis TRACE: passive metrics recorder
+  demos/     # runnable demos (consumers); demos/demo1_room is Demo 1
+  tests/     # pytest suite (synthetic; one guarded real-download integration test)
+  pyproject.toml
+```
+
+Each component is an independent, importable package with its own README. Demos
+are separate consumers that drive `nexus` and render; they never re-implement
+component wiring.
 
 ## Develop / test
 

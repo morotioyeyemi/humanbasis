@@ -176,7 +176,8 @@ def main() -> None:
     parser.add_argument("--room-size", type=float, default=10.0, help="side length of the square room")
     parser.add_argument("--synthetic", action="store_true", help="use synthetic signal (no download)")
     parser.add_argument("--no-render", action="store_true", help="run the loop only, skip the gif (scale test)")
-    parser.add_argument("--out", type=str, default=str(Path(__file__).parent / "demo1.gif"))
+    parser.add_argument("--out", type=str, default=str(Path(__file__).parent / "outputs" / "demo1.gif"),
+                        help="output path; extension picks the format (.gif or .mp4)")
     args = parser.parse_args()
 
     import time as _time
