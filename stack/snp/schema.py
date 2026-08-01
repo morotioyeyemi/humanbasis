@@ -11,8 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-# Allowed top-level signal categories. This list documents intent; SNP does not
-# infer meaning from it. v1 uses "motor" (Brain) and "perception" (Locus).
+# Documented vocabulary of top-level signal categories. This is intent-only:
+# the encoding REGISTRY (snp.encodings) is the single source of truth, and
+# validation checks a message's signal_type against its encoding's declared
+# signal_type. Adding a modality is a registry edit, not a change here.
 SIGNAL_TYPES = ("motor", "visual", "cognitive", "emotional", "perception")
 
 ENVELOPE_FIELDS = ("node_id", "timestamp", "signal_type", "payload")

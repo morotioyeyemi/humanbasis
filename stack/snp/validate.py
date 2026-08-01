@@ -10,12 +10,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Union
 
-from .encodings import expected_length, is_registered
+from .encodings import expected_length, is_registered, signal_type_for
 from .errors import SchemaError, UnknownEncodingError, VectorLengthError
 from .schema import (
     ENVELOPE_FIELDS,
     PAYLOAD_FIELDS,
-    SIGNAL_TYPES,
     SNPMessage,
 )
 
@@ -58,10 +57,8 @@ def validate(message: MessageLike) -> SNPMessage:
         raise SchemaError("node_id must be a non-empty string")
     if isinstance(data["timestamp"], bool) or not isinstance(data["timestamp"], int):
         raise SchemaError("timestamp must be an int (unix ms)")
-    if data["signal_type"] not in SIGNAL_TYPES:
-        raise SchemaError(
-            f"signal_type must be one of {SIGNAL_TYPES}, got {data['signal_type']!r}"
-        )
+    if not isinstance(data["signal_type"], str) or not data["signal_type"]:
+        raise SchemaError("signal_type must be a non-empty string")
 
     payload = data["payload"]
     if not isinstance(payload, dict):
@@ -91,6 +88,13 @@ def validate(message: MessageLike) -> SNPMessage:
     encoding = payload["encoding"]
     if not is_registered(encoding):
         raise UnknownEncodingError(f"unknown encoding id: {encoding!r}")
+
+    expected_signal_type = signal_type_for(encoding)
+    if data["signal_type"] != expected_signal_type:
+        raise SchemaError(
+            f"signal_type {data['signal_type']!r} does not match encoding "
+            f"{encoding!r} declared signal_type {expected_signal_type!r}"
+        )
 
     declared = expected_length(encoding)
     if len(vector) != declared:

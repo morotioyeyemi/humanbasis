@@ -31,50 +31,63 @@ class Layout:
     """The declared shape and meaning of a labeled float vector.
 
     Attributes:
+        signal_type: The message signal_type this encoding belongs to, e.g.
+            ``"motor"``. The registry is the single source of truth: a message's
+            ``signal_type`` must match its encoding's declared ``signal_type``.
         layout: The kind of encoding, e.g. ``"channel_band_power"``.
-        channels: Ordered channel names the vector is built from.
-        bands: Mapping of band name to its ``[low_hz, high_hz]`` range.
+        channels: Ordered channel (or field) names the vector is built from.
+        bands: Mapping of band name to its ``[low_hz, high_hz]`` range. Empty for
+            non-band layouts (e.g. ``"pose_visible"``).
         order: How channels and bands are flattened, e.g. ``"channel_major"``.
         rate_hz: Sampling rate the source signal was resampled to.
         window_s: Window length, in seconds, of one emitted segment.
-        length: The exact number of floats in a conforming vector.
+        length: The exact number of floats in a conforming vector. Derived
+            automatically: ``len(channels) * len(bands)`` when bands are present,
+            else ``len(channels)``. Never hand-entered, so it cannot drift.
     """
 
+    signal_type: str
     layout: str
     channels: Tuple[str, ...]
     bands: Tuple[Tuple[str, Tuple[float, float]], ...]
     order: str
     rate_hz: float
     window_s: float
-    length: int
+    length: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        derived = len(self.channels) * len(self.bands) if self.bands else len(self.channels)
+        object.__setattr__(self, "length", derived)
 
 
 # --- Registry -------------------------------------------------------------
 # Add an entry here to scale channels or add a modality; nothing downstream
 # changes because the infra treats the vector as opaque and reads only length.
+# The registry is the single source of truth for what modalities/encodings
+# exist: a message's signal_type must match its encoding's declared signal_type.
 
 REGISTRY: Dict[str, Layout] = {
     # Basis Brain v1: motor imagery, binary left/right hand.
     # 3 channels (C3, Cz, C4) x 2 bands (mu, beta) = 6 floats.
     "mi.c3czc4.mubeta.v1": Layout(
+        signal_type="motor",
         layout="channel_band_power",
         channels=("C3", "Cz", "C4"),
         bands=(("mu", (8.0, 13.0)), ("beta", (13.0, 30.0))),
         order="channel_major",
         rate_hz=128.0,
         window_s=2.0,
-        length=6,
     ),
     # Basis Locus v1: white-room perception update.
     # Illustrative layout; consumed only by Brain in a future closed loop.
     "env.room.pose_visible.v1": Layout(
+        signal_type="perception",
         layout="pose_visible",
         channels=("pose_x", "pose_y", "heading", "distance_to_object", "object_visible"),
         bands=(),
         order="field_order",
         rate_hz=0.0,
         window_s=0.0,
-        length=5,
     ),
 }
 
@@ -95,5 +108,15 @@ def is_registered(encoding: str) -> bool:
 
 
 def expected_length(encoding: str) -> int:
-    """Return the declared vector length for an encoding id."""
+    """Return the derived vector length for an encoding id."""
     return REGISTRY[encoding].length
+
+
+def signal_type_for(encoding: str) -> str:
+    """Return the signal_type an encoding id belongs to."""
+    return REGISTRY[encoding].signal_type
+
+
+def known_signal_types() -> frozenset:
+    """Return the set of signal_types declared by the registry."""
+    return frozenset(layout.signal_type for layout in REGISTRY.values())

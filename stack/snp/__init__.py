@@ -14,6 +14,8 @@ from .encodings import (
     expected_length,
     get_layout,
     is_registered,
+    known_signal_types,
+    signal_type_for,
 )
 from .errors import (
     SchemaError,
@@ -36,6 +38,8 @@ __all__ = [
     "expected_length",
     "get_layout",
     "is_registered",
+    "known_signal_types",
+    "signal_type_for",
     "SNPError",
     "SchemaError",
     "UnknownEncodingError",

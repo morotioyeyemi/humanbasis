@@ -52,6 +52,14 @@ def test_unknown_signal_type():
         snp.validate(data)
 
 
+def test_signal_type_must_match_encoding():
+    # Valid registered encoding, but signal_type from a different modality.
+    data = valid_motor_message()
+    data["signal_type"] = "perception"  # encoding declares "motor"
+    with pytest.raises(snp.SchemaError):
+        snp.validate(data)
+
+
 def test_missing_payload_field():
     data = valid_motor_message()
     del data["payload"]["confidence"]
