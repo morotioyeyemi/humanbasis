@@ -3,17 +3,17 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "basis-snp"
+name = "basis-stack"
 version = "0.1.0"
-description = "SNP (Signal Normalization Protocol): the canonical message contract for the Basis stack."
+description = "The Basis Nexus stack: SNP contract, Basis Brain, Basis TRACE."
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["numpy>=1.24", "scipy>=1.10", "mne>=1.6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
 [tool.setuptools]
-packages = ["snp"]
+packages = ["snp", "brain", "trace"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
