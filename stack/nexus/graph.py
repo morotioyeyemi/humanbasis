@@ -48,6 +48,10 @@ class GraphTickResult:
     holders: Dict[str, Any]
     conflicts_this_tick: int
     fabric_metrics: Dict[str, int]
+    # Optional rich detail, populated only when tick(capture=True).
+    focus_signals: Optional[Dict[str, Any]] = None   # node_id -> {vector, action, label, encoding}
+    focus_room: Optional[Dict[str, Any]] = None       # node_id -> (x, y, heading)
+    focus_shard: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Deterministic, JSON-serializable form (no wall-clock)."""
@@ -156,15 +160,38 @@ class Graph:
     def _resource_of(self, node_id: str) -> str:
         return f"res_{_stable_index(node_id, self.config.graph.n_shared_resources)}"
 
-    def tick(self) -> GraphTickResult:
-        """Run one graph tick: per-shard signal loops + Fabric consensus."""
+    def tick(self, capture: bool = False) -> GraphTickResult:
+        """Run one graph tick: per-shard signal loops + Fabric consensus.
+
+        Args:
+            capture: If True, record rich per-node detail for one focus shard
+                (the first shard) - each node's signal vector, decoded action,
+                and ground-truth label, plus the shard's room snapshot. Adds
+                overhead; intended for visualization on small graphs, not the
+                hot path.
+        """
+        from locus import decoders as _decoders
+
         conflicts_before = self.fabric.metrics["conflicts"]
         n_nodes = 0
+        focus_signals: Dict[str, Any] = {}
+        focus_shard_index = self.shards[0].index if (capture and self.shards) else None
 
         for shard in self.shards:
+            capturing = capture and shard.index == focus_shard_index
             for brain in shard.brains:
                 n_nodes += 1
                 msg = brain.emit()
+                if capturing:
+                    vector = msg["payload"]["vector"]
+                    action = _decoders.decode(brain.encoding, vector)
+                    focus_signals[brain.node_id] = {
+                        "vector": vector,
+                        "action": action,
+                        "label": getattr(brain, "_last_label", ""),
+                        "encoding": brain.encoding,
+                        "signal_type": brain.signal_type,
+                    }
                 shard.locus.process(msg)  # decode -> action -> apply -> perceive
                 # Contend for a globally shared resource (cross-authority write).
                 self.fabric.propose(Write(
@@ -182,6 +209,10 @@ class Graph:
                 "tick": self._tick, "n_shards": len(self.shards), "n_nodes": n_nodes,
             })
 
+        focus_room = None
+        if capture and focus_shard_index is not None:
+            focus_room = self.shards[0].locus.snapshot()
+
         result = GraphTickResult(
             tick=self._tick,
             n_shards=len(self.shards),
@@ -189,6 +220,9 @@ class Graph:
             holders=holders,
             conflicts_this_tick=self.fabric.metrics["conflicts"] - conflicts_before,
             fabric_metrics=dict(self.fabric.metrics),
+            focus_signals=focus_signals or None,
+            focus_room=focus_room,
+            focus_shard=focus_shard_index,
         )
         if self._run_log is not None:
             import json as _json
