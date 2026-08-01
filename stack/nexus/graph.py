@@ -49,6 +49,17 @@ class GraphTickResult:
     conflicts_this_tick: int
     fabric_metrics: Dict[str, int]
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Deterministic, JSON-serializable form (no wall-clock)."""
+        return {
+            "tick": self.tick,
+            "n_shards": self.n_shards,
+            "n_nodes": self.n_nodes,
+            "holders": {k: self.holders[k] for k in sorted(self.holders)},
+            "conflicts_this_tick": self.conflicts_this_tick,
+            "fabric_metrics": dict(self.fabric_metrics),
+        }
+
 
 class Graph:
     """A sharded, multi-authority world driven through Fabric.
@@ -59,7 +70,8 @@ class Graph:
         fabric: Optional preconstructed Fabric (else built from config).
     """
 
-    def __init__(self, config: BasisConfig, *, trace: Optional[Any] = None, fabric: Optional[Fabric] = None) -> None:
+    def __init__(self, config: BasisConfig, *, trace: Optional[Any] = None, fabric: Optional[Fabric] = None,
+                 run_log_path: Optional[str] = None) -> None:
         self.config = config.validate()
         self._trace = trace
         self.fabric = fabric or Fabric(
@@ -69,6 +81,14 @@ class Graph:
         self._tick = 0
         self._next_shard_index = 0
         self._encodings = config.signal.modalities or [config.signal.encoding]
+        self._run_log_path = run_log_path or config.log.raw_log_path
+        self._run_log = None
+        if self._run_log_path:
+            import io
+            from pathlib import Path as _Path
+
+            _Path(self._run_log_path).parent.mkdir(parents=True, exist_ok=True)
+            self._run_log = open(self._run_log_path, "w", encoding="utf-8")  # noqa: SIM115
         for _ in range(config.graph.n_shards):
             self.add_shard()
 
@@ -170,8 +190,19 @@ class Graph:
             conflicts_this_tick=self.fabric.metrics["conflicts"] - conflicts_before,
             fabric_metrics=dict(self.fabric.metrics),
         )
+        if self._run_log is not None:
+            import json as _json
+
+            self._run_log.write(_json.dumps(result.to_dict()) + "\n")
+            self._run_log.flush()
         self._tick += 1
         return result
+
+    def close(self) -> None:
+        """Close the raw run log if one is open."""
+        if self._run_log is not None:
+            self._run_log.close()
+            self._run_log = None
 
     def run(self, ticks: int) -> List[GraphTickResult]:
         """Run ``ticks`` graph ticks and return the per-tick results."""
