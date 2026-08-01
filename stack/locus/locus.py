@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 import snp
 
 from . import decoders
-from .environment import WhiteRoom
+from .environment import ROOM_MAX, WhiteRoom
 
 PERCEPTION_ENCODING = "env.room.pose_visible.v1"
 PERCEPTION_PARADIGM = "locus_room_v1"
@@ -24,13 +24,21 @@ class Locus:
     """Shared environment state manager for the white room.
 
     Args:
-        room: The environment to manage. A fresh empty room by default.
+        room: The environment to manage. If omitted, a fresh room of side
+            ``size`` is created.
+        size: Side length for the auto-created room (ignored if ``room`` given).
         trace: Optional Basis TRACE recorder; if given, decode/apply/perceive
             are timed.
     """
 
-    def __init__(self, room: Optional[WhiteRoom] = None, *, trace: Optional[Any] = None) -> None:
-        self.room = room or WhiteRoom()
+    def __init__(
+        self,
+        room: Optional[WhiteRoom] = None,
+        *,
+        size: float = ROOM_MAX,
+        trace: Optional[Any] = None,
+    ) -> None:
+        self.room = room or WhiteRoom(size=size)
         self._trace = trace
 
     def add_node(self, node_id: str, x: float, y: float, heading: float = 0.0) -> None:
